@@ -8,7 +8,7 @@
 
 
 /** static variables */
-const frac16 cordic_gain = TO_FRAC_16(0.607252935f);
+static const frac16 cordic_gain = TO_FRAC_16(0.607252935f);
 
 /*
  * cordic private core routine
