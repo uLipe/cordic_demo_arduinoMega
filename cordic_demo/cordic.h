@@ -1,10 +1,12 @@
 #pragma once 
 
 #include <cstdint>
-#include <cmath>
+
+extern "C" {
+    #include <math.h>
+}
 
 namespace ArduinoCordic {
-
 /**
  * @fn GetSine
  * @brief Calculates the sine of given angle using cordic
@@ -27,5 +29,12 @@ int16_t GetSine(int16_t angle);
  */
 int16_t GetCosine(int16_t angle);
 
-}
+/**
+ * @fn GetMaxRange
+ * @brief Gets the max range of this Cordic implementation
+ * @return  scaled max range allowed by Cordic 
+ * @note returned value gets scaled by 16384
+ */
+int16_t GetMaxRange();
 
+}

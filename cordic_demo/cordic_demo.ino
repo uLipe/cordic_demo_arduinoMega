@@ -2,11 +2,7 @@
  * Cordic on Arduino Demo, calculates the sine and cosine
  * and displays the waveform on Arduino plotter
  */
-
-#include <cmath>
 #include "cordic.h"
-
-#define kMaxRange int16_t(M_PI_2 * 16384.0f)
 
 int16_t angle = 0;
 uint8_t quarter = 0;
@@ -28,7 +24,7 @@ void loop (void) {
     //first quarter just increments until pi/2
     case 0:
       angle++;
-      if(angle == kMaxRange) {
+      if(angle == ArduinoCordic::GetMaxRange()) {
         quarter++;
       }
     break;
@@ -44,7 +40,7 @@ void loop (void) {
     //third quarter, time for negative angles, go until -pi/2
     case 2:
       angle--;
-      if(angle == -kMaxRange) {
+      if(angle == -ArduinoCordic::GetMaxRange()) {
         quarter++;
       }
     break;
@@ -58,6 +54,5 @@ void loop (void) {
     break;
   }
 
-  delay_ms(1);
+  delay(1);
 }
-

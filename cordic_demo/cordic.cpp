@@ -134,4 +134,8 @@ int16_t GetCosine(int16_t angle) {
     return (x);
 }
 
+int16_t GetMaxRange() {
+    return cordic_max_range;
+}
+
 }
