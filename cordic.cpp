@@ -1,35 +1,41 @@
 
-/*
- * @brief cordic class implementation
- */
- 
-#include <math.h>
+
 #include "cordic.h"
 
+namespace ArduinoCordic {
 
-/** static variables */
-static const frac16 cordic_gain = TO_FRAC_16(0.607252935f);
+static const int16_t cordic_max_range = (int16_t)((M_PI_2) * (float)(1 << 14));
+static const int16_t cordic_gain = (int16_t)(0.607252935f * (float)(1 << 15));
+static const int16_t atan_base = (int16_t)(0.785398f * (float)(1 << 14));
+static const int16_t atan_lookup[16] = {
+    (atan_base >> 0),
+    (atan_base >> 1),
+    (atan_base >> 2),
+    (atan_base >> 3),
+    (atan_base >> 4),
+    (atan_base >> 5),
+    (atan_base >> 6),
+    (atan_base >> 7),
+    (atan_base >> 8),
+    (atan_base >> 9),
+    (atan_base >> 10),
+    (atan_base >> 11),
+    (atan_base >> 12),
+    (atan_base >> 13),
+    (atan_base >> 14),
+    (atan_base >> 15),
+};
 
-/*
- * cordic private core routine
- */
-static inline void CordicCompute(frac16 *x, frac16 *y, frac12 *z, int iter, const frac12 *tab)
+static inline void CordicKernelCompute(int16_t *x, int16_t *y, int16_t *z)
 {
-    frac16 xtmp = 0, xprev = 0, ytmp = 0, yprev = 0;
-    frac12 ztmp = 0;
+    int16_t xtmp = 0, xprev = 0, ytmp = 0, yprev = 0;
+    int16_t ztmp = 0;
   
-    /*
-     *initialize cordic variables:
-     */
     xtmp = *x;
     ytmp = *y;
     ztmp = *z;
 
-
-    signed int  d = ( ztmp < 0? -1 : 1);
-
-
-    for( int i = 0; i < iter; i++) {
+    for( int i = 0; i < 16; i+= 4) {
         /*
          * To compute cordic new operation we need
          * to execute for N iterations the following
@@ -40,139 +46,92 @@ static inline void CordicCompute(frac16 *x, frac16 *y, frac12 *z, int iter, cons
          * znext = z - d*atantab[i]
          */
 
+        /* unroll the loop by 4 to speedup the calculations a bit */
         xprev = (xtmp >> i);
         yprev = (ytmp >> i);
-        d =( ztmp < 0? -1 : 1);
 
-        if(d > 0) {
+        if(ztmp > 0) {
             xtmp = xtmp - yprev;
             ytmp = ytmp + xprev;
-            ztmp = ztmp -  tab[i];
-        }
-        else {
+            ztmp = ztmp -  atan_lookup[i];
+        } else {
             xtmp = xtmp + yprev;
             ytmp = ytmp - xprev;
-            ztmp = ztmp +  tab[i];
+            ztmp = ztmp +  atan_lookup[i];
+        }
+
+        xprev = (xtmp >> (i + 1));
+        yprev = (ytmp >> (i + 1));
+
+        if(ztmp > 0) {
+            xtmp = xtmp - yprev;
+            ytmp = ytmp + xprev;
+            ztmp = ztmp -  atan_lookup[i + 1];
+        } else {
+            xtmp = xtmp + yprev;
+            ytmp = ytmp - xprev;
+            ztmp = ztmp +  atan_lookup[i + 1];
+        }
+
+        xprev = (xtmp >> (i + 2));
+        yprev = (ytmp >> (i + 2));
+
+        if(ztmp > 0) {
+            xtmp = xtmp - yprev;
+            ytmp = ytmp + xprev;
+            ztmp = ztmp -  atan_lookup[i + 2];
+        } else {
+            xtmp = xtmp + yprev;
+            ytmp = ytmp - xprev;
+            ztmp = ztmp +  atan_lookup[i + 2];
+        }
+
+        xprev = (xtmp >> (i + 3));
+        yprev = (ytmp >> (i + 3));
+
+        if(ztmp > 0) {
+            xtmp = xtmp - yprev;
+            ytmp = ytmp + xprev;
+            ztmp = ztmp -  atan_lookup[i + 3];
+        } else {
+            xtmp = xtmp + yprev;
+            ytmp = ytmp - xprev;
+            ztmp = ztmp +  atan_lookup[i + 3];
         }
 
     }
 
-    /*
-     * after end of computation deposit the result:
-     */
     *x = xtmp;
     *y = ytmp;
     *z = ztmp;
-
 }
 
+int16_t GetSine(int16_t angle) {
 
+    if(angle > cordic_max_range || angle < -cordic_max_range) {
+        return 0;
+    }
 
-/** Cordic public methods */
+    int16_t z = angle;
+    int16_t x = cordic_gain;
+    int16_t y = 0;
 
-/*
- * cordic_engine()
- */
-cordic_engine::cordic_engine(int res)
-{
-
-    resolution = res;
-    m_atanTab = new frac12[resolution];
-
-    /*
-     * based on resolution computes the atantab
-     */
-     frac16 base = TO_FRAC_12(0.785398f);
-
-     for(int i = 0 ; i < res; i++) {
-         m_atanTab[i] = base >> i;
-     }
-
+    CordicKernelCompute(&x, &y, &z);
+    return (y);
 }
 
-/*
- * ~cordic_engine
- */
-cordic_engine::~cordic_engine()
-{
-    /* only needs to destroy atan tab memory area */
-    delete []m_atanTab;
+int16_t GetCosine(int16_t angle) {
+
+    if(angle > cordic_max_range || angle < -cordic_max_range) {
+        return 0;
+    }
+
+    int16_t z = angle;
+    int16_t x = cordic_gain;
+    int16_t y = 0;
+
+    CordicKernelCompute(&x, &y, &z);
+    return (x);
 }
 
-/*
- * set resulotion()
- */
-void cordic_engine::set_resolution(int res)
-{
-    /*
-     * WARNING, this function is not thread safe,
-     * make sure the cordic is not running in other
-     * context before to invoke this method
-     */
-     resolution = res;
-     frac16 base = TO_FRAC_12(0.785398f);
-
-     delete []m_atanTab;
-     m_atanTab = new frac12[res];
-
-     /*
-      * re-computes the new length lookup
-      */
-     for(int i = 0 ; i < res; i++) {
-         m_atanTab[i] = base >> i;
-     }
-
-
-}
-
-
-/*
- * get_resolution()
- */
-int cordic_engine::get_resolution(void)
-{
-    return(resolution);
-}
-
-/*
- * sine()
- */
-frac16 cordic_engine::sine(frac12 angle)
-{
-    frac16 x, y;
-    frac12 z;
-
-    /*
-     * intialize cordic for Sine
-     */
-    z = angle;
-    x = cordic_gain;
-    y = 0;
-
- 
-    /* compute it */
-    CordicCompute(&x, &y, &z, resolution, m_atanTab);
-
-    return(y);
-}
-
-/*
- * cosine()
- */
-frac16 cordic_engine::cosine(frac12 angle)
-{
-    frac16 x, y;
-    frac12 z;
-
-    /*
-     * intialize cordic for Sine
-     */
-    z = angle;
-    x = cordic_gain;
-    y = 0;
-
-    /* compute it */
-    CordicCompute(&x, &y, &z, resolution, m_atanTab);
-
-    return(x);
 }

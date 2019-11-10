@@ -1,87 +1,63 @@
 /**
- *     @brief Cordic application demo
+ * Cordic on Arduino Demo, calculates the sine and cosine
+ * and displays the waveform on Arduino plotter
  */
 
-#include <math.h>
+#include <cmath>
 #include "cordic.h"
-#include "frac_math_helper.h"
 
-/** Defines the resolution of our cordic engine */
-#define DEMO_RESOLUTION 16
+#define kMaxRange int16_t(M_PI_2 * 16384.0f)
 
-/** Define if angle increments or decrements */
-#define DIRECTION       1
+int16_t angle = 0;
+uint8_t quarter = 0;
 
-/** Variables used in this file */
-cordic_engine cordic(DEMO_RESOLUTION);
-
-/** Angle variable */
-frac12 angle = TO_FRAC_12(0.0f);
-frac16 cosine;
-frac16 sine;
-
-/**
- * @brief Arduino default setup routine
- */
-void setup (void)
-{
-  /* Open serial port */
-  Serial.begin(115200);
-
+void setup (void) {
+  //Uses high baud rate to improve the data visualization
+  Serial.begin(2000000);
 }
 
-/**
- * @brief Arduino default main loop
- */
-void loop (void)
-{
-  /* Prints a greeting message */
-  Serial.println("Welcome to cordic Demo App \n\r");
+void loop (void) {
 
+  //Prints the calculated data on serial plottet (we can see the waveform)
+  Serial.print(ArduinoCordic::GetCosine(angle));
+  Serial.print(",");
+  Serial.println(ArduinoCordic::GetSine(angle));
 
-  for (;;) {
+  //manage the next point using circle symmetry:
+  switch(quarter) {
+    //first quarter just increments until pi/2
+    case 0:
+      angle++;
+      if(angle == kMaxRange) {
+        quarter++;
+      }
+    break;
 
-    /* take sine and cosine of current angle and
-     * prints on the console
-     */
-    sine = cordic.sine(angle);
-    cosine = cordic.cosine(angle);
+    //second quarter, decreases angle until zero and forms 1st half of circle
+    case 1:
+      angle--;
+      if(angle == 0) {
+        quarter++;
+      }
+    break;
 
+    //third quarter, time for negative angles, go until -pi/2
+    case 2:
+      angle--;
+      if(angle == -kMaxRange) {
+        quarter++;
+      }
+    break;
 
-    Serial.print("Sine value of   ");
-
-    /* converts angles to degrees */
-    Serial.print((FRAC_12_TO_FLOAT(angle) * 180.0f) / 3.14159f);
-    Serial.print("  is: ");
-    Serial.print(FRAC_16_TO_FLOAT(sine));
-    Serial.print("\n\r");
-
-    /* converts angles to degrees  in cosine too*/
-    Serial.print("Cosine value of   ");
-    Serial.print((FRAC_12_TO_FLOAT(angle) * 180.0f) / 3.14159f);
-    Serial.print("  is:  ");
-    Serial.print(FRAC_16_TO_FLOAT(cosine));
-    Serial.print("\n\r");
-
-#if DIRECTION == 1
-    /* We compute a quarter turn of canonical circle
-     * which stills sufficient to demonstrate
-     * basic cordic funcionality
-     */
-    angle += TO_FRAC_12(0.02f);
-    if (angle > TO_FRAC_12(1.5708f)) {
-    angle = TO_FRAC_12(0.0f);
-    }
-#else
-    angle -= TO_FRAC_12(0.02f);
-    if (angle < TO_FRAC_12(-1.5708f)) {
-    angle = TO_FRAC_12(0.0f);
-    }
-#endif
-    
-
-     delay(500);
-   
+    // fourth quarter, negative towards to zero and complete the waveform
+    case 3:
+      angle++;
+      if(angle == 0) {
+        quarter = 0;
+      }
+    break;
   }
+
+  delay_ms(1);
 }
 
